@@ -3,7 +3,8 @@ local fs = require("filesystem")
 local PATH = "/etc/oc-bank.cfg"
 
 local DEFAULT_CONFIG = [[
-
+-- The path to the database file
+db.path = "/var/db"
 ]]
 
 local function existsDir(path)
@@ -16,9 +17,13 @@ end
 
 local function loadConfig()
   local base = {
+    db = {}
   }
 
   local default = {
+    db = {
+      path = "/var/db"
+    }
   }
 
   local config = {}
