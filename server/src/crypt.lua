@@ -1,3 +1,4 @@
+local bit32 = require("bit32")
 local com = require("component")
 
 local dataCard = com.data
@@ -10,6 +11,16 @@ local STATES = {
   Finished = 3,
   Established = 4
 }
+
+local function u64(num)
+  num = num % 0xffffffffffffffff
+  local result = ""
+  for i = 1, 8, 1 do
+    result = string.char(bit32.band(num, 0xff)) .. result
+    num = bit32.rshift(num, 8)
+  end
+  return result
+end
 
 local function genSessionKey(authKey, pin)
   return dataCard.md5(authKey, pin):sub(1, 4)
@@ -95,7 +106,7 @@ do
         clientCipher = "",
         serverMac = "",
         clientMac = ""
-      }
+      },
       encrypt = function(data, key)
         return data
       end,
@@ -104,7 +115,7 @@ do
       end,
       mac = function(data, key)
         return ""
-      end
+      end,
       state = STATES.Hello
     }, meta)
   end
