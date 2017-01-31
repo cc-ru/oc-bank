@@ -30,6 +30,10 @@ local function genAuthKey()
   return dataCard.random(4)
 end
 
+local function genSession()
+  return dataCard.random(32)
+end
+
 local function PHash(hashHmac)
   return function(secret, seed, len)
     local seedH = seed
