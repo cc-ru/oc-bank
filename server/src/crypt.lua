@@ -96,6 +96,9 @@ do
       local decData = data .. mac
       local encData = iv .. self.encrypt(data, self.keys.serverCipher, iv)
       return encData
+    end,
+    send = function(self, data)
+      -- TODO: implement
     end
   }
 
@@ -120,14 +123,62 @@ do
       mac = function(data, key)
         return ""
       end,
-      state = STATES.Hello
+      state = STATES.Hello,
+      packets = {},
+      clientRandom = "",
+      serverRandom = "",
+      masterSecret = "",
+      msg = "",
+      client = ""
     }, meta)
   end
 end
 
 local function handshake(state)
+  local msg = state.msg
   if state.state == STATES.Hello then
+    if #msg == 32 then
+      state.clientRandom = msg:sub(1, 32)
+      table.insert(state.packets, msg)
+      state.serverRandom = dataCard.random(32)
+      state:send(state.serverRandom)
+      state.state = state.state + 1
+    end
   elseif state.state == STATES.KeyExchange then
+    local pms = rsaDecrypt(msg, config.crypt.private)
+    local masterSecret = md5prf(pms, "master secret", state.clientRandom .. state.serverRandom, 48)
+    local keys = md5prf(masterSecret, "key expension", state.serverRandom .. state.clientRandom, 48)
+    state.keys.clientMac = keys:sub(1, 16)
+    state.keys.serverMac = keys:sub(17, 32)
+    state.keys.clientCipher = keys:sub(33, 48)
+    state.keys.serverCipher = keys:sub(49, 64)
+    state.encrypt = dataCard.encrypt
+    state.decrypt = dataCard.decrypt
+    state.mac = dataCard.md5
+    state.seqnum.write = 0
+    state.seqnum.read = 0
+    state.masterSecret = masterSecret
+    table.insert(state.packets, msg)
+    state.state = state.state + 1
   elseif state.state == STATES.Finished then
+    local clientFinished = md5prf(
+      state.masterSecret,
+      "client finished",
+      dataCard.md5(table.concat(state.packets)),
+      12)
+    if msg == clientFinished then
+      table.insert(state.packets, msg)
+      local serverFinished = md5prf(
+        state.masterSecret,
+        "server finished",
+        dataCard.md5(table.concat(state.packets)),
+        12)
+      state:send(serverFinished)
+      state.packets = nil
+      state.masterSecret = nil
+      state.clientRandom = nil
+      state.serverRandom = nil
+      state.state = state.state + 1
+    end
   end
 end
