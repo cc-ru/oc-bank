@@ -1,7 +1,15 @@
 {name="oc-bank-server",
  version="0.0.0",
  dependencies={
-  {name="libaevent", version="^1.1"}
+  {name="libaevent", version="^1.1"},
+  {name="zn", version="^1.0"}
  },
  files={
+  {url="src/config.lua", dir="/usr/lib/oc-bank", name="config.lua"},
+  {url="src/crypt.lua", dir="/usr/lib/oc-bank", name="crypt.lua"},
+  {url="src/db.lua", dir="/usr/lib/oc-bank", name="db.lua"},
+  {url="src/events.lua", dir="/usr/lib/oc-bank", name="events.lua"},
+  {url="src/main.lua", dir="/usr/lib/oc-bank", name="main.lua"},
+  {url="src/module.lua", dir="/usr/lib/oc-bank", name="module.lua"},
+  {url="src/network.lua", dir="/usr/lib/oc-bank", name="network.lua"}
  }}
