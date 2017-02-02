@@ -5,6 +5,10 @@ local events = {}
 local Engine = aevent()
 events.Init = Engine:event("init")
 events.Stop = Engine:event("stop")
+events.ZnMsg = Engine:event("znmsg")
+events.SendMsg = Engine:event("sendmsg")
+
+Engine:stdEvent("zn_message", events.ZnMsg)
 
 events.engine = Engine
 
