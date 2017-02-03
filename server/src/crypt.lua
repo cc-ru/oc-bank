@@ -7,10 +7,23 @@ assert(dataCard.decrypt, "Data card T2 and higher required")
 
 local module = require("oc-bank.module")
 local events = module.load("events")
-local network = module.load("network")
 
-local STATES = network.STATES
-local u64 = network.u64
+local STATES = {
+  Hello = 1,
+  KeyExchange = 2,
+  Finished = 3,
+  Established = 4
+}
+
+local function u64(num)
+  num = num % 0xffffffffffffffff
+  local result = ""
+  for i = 1, 8, 1 do
+    result = string.char(bit32.band(num, 0xff)) .. result
+    num = bit32.rshift(num, 8)
+  end
+  return result
+end
 
 local function genSessionKey(authKey, pin)
   return dataCard.md5(authKey, pin):sub(1, 4)

@@ -7,6 +7,7 @@ events.Init = Engine:event("init")
 events.Stop = Engine:event("stop")
 events.ZnMsg = Engine:event("znmsg")
 events.SendMsg = Engine:event("sendmsg")
+events.Msg = Engine:event("msg")
 
 Engine:stdEvent("zn_message", events.ZnMsg)
 
