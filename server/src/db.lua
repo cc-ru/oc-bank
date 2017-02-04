@@ -24,4 +24,9 @@ mod.save = function()
   saveDB(mod.db)
 end
 
+if not mod.db.users or not mod.db.log then
+  mod.db = {users = {}, log = {}}
+  mod.save()
+end
+
 return mod
