@@ -11,5 +11,6 @@
   {url="src/events.lua", dir="/usr/lib/oc-bank", name="events.lua"},
   {url="src/main.lua", dir="/usr/lib/oc-bank", name="main.lua"},
   {url="src/module.lua", dir="/usr/lib/oc-bank", name="module.lua"},
-  {url="src/network.lua", dir="/usr/lib/oc-bank", name="network.lua"}
+  {url="src/network.lua", dir="/usr/lib/oc-bank", name="network.lua"},
+  {url="src/ops.lua", dir="/usr/lib/oc-bank", name="ops.lua"}
  }}

@@ -37,6 +37,10 @@ local function genSession()
   return dataCard.random(32)
 end
 
+local function genPin()
+  return dataCard.random(4)
+end
+
 local function PHash(hashHmac)
   return function(secret, seed, len)
     local seedH = seed
@@ -195,5 +199,8 @@ return {
   newState = newState,
   genSession,
   genAuthKey,
-  genSessionKey
+  genSessionKey,
+  STATES = STATES,
+  u64 = u64,
+  genPin = getPin
 }

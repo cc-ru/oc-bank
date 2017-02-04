@@ -197,3 +197,10 @@ local function cancel(tid)
   db.save()
   return true, id
 end
+
+return {
+  newUser = newUser,
+  transfer = transfer,
+  buy = buy,
+  cancel = cancel
+}
