@@ -7,12 +7,20 @@ assert(dataCard.decrypt, "Data card T2 and higher required")
 
 local module = require("oc-bank.module")
 local events = module.load("events")
+local ops = module.load("ops")
 
 local STATES = {
   Hello = 1,
   KeyExchange = 2,
   Finished = 3,
   Established = 4
+}
+
+local OPSTEPS = {
+  None = 0,
+  Session = 1,
+  Operation = 2,
+  Confirmation = 3
 }
 
 local function u64(num)
@@ -39,6 +47,22 @@ end
 
 local function genPin()
   return dataCard.random(4)
+end
+
+local function genOpKey()
+  return dataCard.random(4)
+end
+
+local function genConfirmKey(opkey, pin, operation)
+  local data = opkey
+  if operation.optype == ops.OPERATIONS.Transfer then
+    data = data .. "transfer" .. operation.from .. operation.to ..
+      u64(math.floor(operation.amount))
+  elseif operation.optype == ops.OPERATIONS.Buy then
+    data = data .. "buy" .. operation.from .. operation.to ..
+      u64(math.floor(operation.amount))
+  end
+  return dataCard.md5(data, pin):sub(1, 4)
 end
 
 local function PHash(hashHmac)
@@ -140,7 +164,13 @@ do
       serverRandom = "",
       masterSecret = "",
       msg = "",
-      client = ""
+      client = "",
+      operation = {
+        step = OPSTEPS.None,
+        authKey = "",
+        session = "",
+        optype = 0
+      }
     }, meta)
   end
 end
@@ -202,5 +232,8 @@ return {
   genSessionKey,
   STATES = STATES,
   u64 = u64,
-  genPin = getPin
+  genPin = getPin,
+  OPSTEPS = OPSTEPS,
+  genOpKey = genOpKey,
+  genConfirmKey = genConfirmKey
 }

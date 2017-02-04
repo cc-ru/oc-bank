@@ -6,7 +6,11 @@ local OPERATIONS = {
   NewAccount = 1,
   Transfer = 2,
   Buy = 3,
-  Cancel = 4
+  Cancel = 4,
+  "NewAccount",
+  "Transfer",
+  "Buy",
+  "Cancel"
 }
 
 local function len(tbl)
@@ -199,6 +203,9 @@ local function cancel(tid)
 end
 
 return {
+  OPERATIONS = OPERATIONS,
+  getUser = getUser,
+  getLine = getLine,
   newUser = newUser,
   transfer = transfer,
   buy = buy,
