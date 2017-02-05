@@ -32,6 +32,15 @@ event.engine:subscribe("znmsg", event.priority.normal, function(handler, evt)
   end
   local msg = conn:read(data[1])
   conn.msg = msg
+  if conn.msg == "close" then
+    for k, v in pairs(conns) do
+      if v == conn then
+        table.remove(conns, k)
+        break
+      end
+    end
+    return
+  end
   if conn.state < crypt.STATES.Established then
     crypt.handshake(conn)
   else
@@ -51,12 +60,12 @@ event.engine:subscribe("msg", event.priority.normal, function(handler, evt)
   if conn.operation.step == crypt.OPSTEPS.None then
     local result, data = pcall(srl.unserialize, conn.msg)
     if not result then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "malformed data"}))
       return
     end
     local user = data[1]
     if not ops.getUser(user) then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "no such user"}))
       return
     end
     conn.operation.authKey = crypt.genAuthKey()
@@ -66,16 +75,16 @@ event.engine:subscribe("msg", event.priority.normal, function(handler, evt)
   elseif conn.operation.step == crypt.OPSTEPS.Session then
     local result, data = pcall(srl.unserialize, conn.msg)
     if not result then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "malformed data"}))
       return
     end
     if result[1] ~= "sessionKey" then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "bad packet"}))
       return
     end
     local sessionKey = crypt.genSessionKey(authKey, ops.getUser(conn.operation.user).pin)
     if sessionKey ~= result[2] then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "bad session key"}))
       return
     end
     conn.operation.session = crypt.genSession()
@@ -84,40 +93,41 @@ event.engine:subscribe("msg", event.priority.normal, function(handler, evt)
   elseif conn.operation.step == crypt.OPSTEPS.Operation then
     local result, data = pcall(srl.unserialize, conn.msg)
     if not result then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "malformed data"}))
       return
     end
     if data[1] ~= "operation" then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "bad packet"}))
       return
     end
     local session = data[2]
     if conn.operation.session ~= session then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "bad session"}))
       return
     end
     local operation = data[3]
-    if not ops.OPERATIONS[operation] then
-      -- TODO: report an error
+    if (not operation ~= ops.OPERATIONS.Transfer or
+        operation ~= ops.OPERATIONS.Buy) then
+      conn:send(srl.seialize({"error", "unknown operation"}))
       return
     end
     if (operation == ops.OPERATIONS.Transfer or
         operation == ops.OPERATIONS.Buy) then
       local from, to, amount, comment = table.unpack(data, 4)
       if not from or not ops.getUser(from) then
-        -- TODO: report an error
+        conn:send(srl.serialize({"error", "no such user"}))
         return
       end
       if not to or not ops.getUser(to) then
-        -- TODO: report an error
+        conn:send(srl.serialize({"error", "no such user"}))
         return
       end
       if type(amount) ~= "number" or amount < 0 then
-        -- TODO: report an error
+        conn:send(srl.serialize({"error", "bad packet"}))
         return
       end
       if type(comment) ~= "string" then
-        -- TODO: report an error
+        conn:send(srl.serialize({"error", "bad packet"}))
         return
       end
       conn.operation.optype = operation
@@ -128,22 +138,19 @@ event.engine:subscribe("msg", event.priority.normal, function(handler, evt)
       conn.operation.opKey = crypt.genOpKey()
       conn:send(srl.serialize({"opkey", conn.operation.opKey}))
       conn.operation.step = conn.operation.step + 1
-    else
-      -- TODO: report an error
-      return
     end
   elseif conn.operation.step == crypt.OPSTEPS.Confirmation then
     local result, data = pcall(srl.unserialize, conn.msg)
     if not result then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "malformed data"}))
       return
     end
     if data[1] ~= "confirmation" then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "bad packet"}))
       return
     end
     if data[2] ~= conn.operation.session then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "bad session"}))
       return
     end
     local confirmKey = crypt.genConfirmKey(
@@ -151,7 +158,7 @@ event.engine:subscribe("msg", event.priority.normal, function(handler, evt)
       ops.getUser(conn.operation.user).pin,
       conn.operation)
     if confirmKey ~= data[3] then
-      -- TODO: report an error
+      conn:send(srl.serialize({"error", "bad confirmation key"}))
       return
     end
     if conn.operation.optype == ops.OPERATIONS.Transfer then
