@@ -8,8 +8,11 @@ events.Stop = Engine:event("stop")
 events.ZnMsg = Engine:event("znmsg")
 events.SendMsg = Engine:event("sendmsg")
 events.Msg = Engine:event("msg")
+events.ConnTOCheck = Engine:event("conntocheck")
 
 Engine:stdEvent("zn_message", events.ZnMsg)
+
+Engine:timer(1, events.ConnTOCheck, math.huge)
 
 events.engine = Engine
 

@@ -48,6 +48,17 @@ event.engine:subscribe("znmsg", event.priority.normal, function(handler, evt)
   end
 end)
 
+event.engine:subscribe("conntocheck", event.priority.normal, function(handler, evt)
+  for i = #conns, 1, -1 do
+    local conn = conns[i]
+    conn.lastMsg = conn.lastMsg + 1
+    if conn.timeAlive > config.network.timeout then
+      conn:send("close")
+      table.remove(conns, i)
+    end
+  end
+end)
+
 event.engine:subscribe("sendmsg", event.priority.normal, function(handler, evt)
   zn.send(evt.state.client, evt.message, evt.timeout)
 end)

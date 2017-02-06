@@ -8,6 +8,9 @@ db.path = "/var/db"
 
 -- The server RSA private key
 crypt.private = {}
+
+-- Connection timeout
+network.timeout = 30
 ]]
 
 local function existsDir(path)
@@ -21,7 +24,8 @@ end
 local function loadConfig()
   local base = {
     db = {},
-    crypt = {}
+    crypt = {},
+    network = {}
   }
 
   local default = {
@@ -30,6 +34,9 @@ local function loadConfig()
     },
     crypt = {
       private = {}
+    },
+    network = {
+      timeout = 30
     }
   }
 

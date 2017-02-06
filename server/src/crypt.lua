@@ -170,7 +170,8 @@ do
         authKey = "",
         session = "",
         optype = 0
-      }
+      },
+      timeAlive = 0
     }, meta)
   end
 end
