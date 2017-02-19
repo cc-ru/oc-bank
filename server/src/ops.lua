@@ -1,5 +1,4 @@
 local module = require("oc-bank.module")
-local crypt = module.load("crypt")
 local db = module.load("db")
 
 local OPERATIONS = {
@@ -78,6 +77,7 @@ local function log(data)
 end
 
 local function newUser(name)
+  local crypt = module.load("crypt")
   if getUser(name) then
     return false
   end

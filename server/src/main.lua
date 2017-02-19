@@ -5,7 +5,13 @@ module.clearCache()
 
 local events = module.load("events")
 
-local Engine = events.Engine
+local engine = events.engine
+
+module.load("config")
+module.load("db")
+module.load("ops")
+module.load("crypt")
+module.load("network")
 
 local running = true
 
@@ -15,6 +21,6 @@ while running do
   end
 end
 
-Engine:__gc()
+engine:__gc()
 
 module.clearCache()

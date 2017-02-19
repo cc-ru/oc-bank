@@ -30,7 +30,7 @@ local function loadConfig()
 
   local default = {
     db = {
-      path = "/var/db"
+      path = "/var/oc-bank/db"
     },
     crypt = {
       private = {}
@@ -105,15 +105,13 @@ local function loadConfig()
   return setGet(base, default, config)
 end
 
-local cfg = loadConfig()
-
 if not existsFile(PATH) then
   local f, reason = io.open(PATH, "w")
   if not f then
     io.stderr:write("Failed to open config file for writing: " .. tostring(reason) .. "\n")
   else
-    file:write(DEFAULT_CONFIG)
-    file:close()
+    f:write(DEFAULT_CONFIG)
+    f:close()
   end
 end
 

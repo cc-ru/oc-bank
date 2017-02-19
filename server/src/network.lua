@@ -16,7 +16,7 @@ events.engine:subscribe("quit", events.priority.normal, function()
   zn.disconnect()
 end)
 
-event.engine:subscribe("znmsg", event.priority.normal, function(handler, evt)
+events.engine:subscribe("znmsg", events.priority.normal, function(handler, evt)
   local data = evt:get()
   local conn
   for k, v in pairs(conns) do
@@ -48,7 +48,7 @@ event.engine:subscribe("znmsg", event.priority.normal, function(handler, evt)
   end
 end)
 
-event.engine:subscribe("conntocheck", event.priority.normal, function(handler, evt)
+events.engine:subscribe("conntocheck", events.priority.normal, function(handler, evt)
   for i = #conns, 1, -1 do
     local conn = conns[i]
     conn.lastMsg = conn.lastMsg + 1
@@ -59,11 +59,11 @@ event.engine:subscribe("conntocheck", event.priority.normal, function(handler, e
   end
 end)
 
-event.engine:subscribe("sendmsg", event.priority.normal, function(handler, evt)
+events.engine:subscribe("sendmsg", events.priority.normal, function(handler, evt)
   zn.send(evt.state.client, evt.message, evt.timeout)
 end)
 
-event.engine:subscribe("msg", event.priority.normal, function(handler, evt)
+events.engine:subscribe("msg", events.priority.normal, function(handler, evt)
   local conn = evt.conn
   if #conn.msg < 1 then
     return
