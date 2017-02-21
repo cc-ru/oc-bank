@@ -1,6 +1,7 @@
 local bit32 = require("bit32")
 local com = require("component")
 
+local cipher = com.advanced_cipher
 local dataCard = com.data
 
 assert(dataCard.decrypt, "Data card T2 and higher required")
@@ -187,21 +188,23 @@ local function handshake(state)
       state.state = state.state + 1
     end
   elseif state.state == STATES.KeyExchange then
-    local pms = rsaDecrypt(msg, config.crypt.private)
-    local masterSecret = md5prf(pms, "master secret", state.clientRandom .. state.serverRandom, 48)
-    local keys = md5prf(masterSecret, "key expension", state.serverRandom .. state.clientRandom, 48)
-    state.keys.clientMac = keys:sub(1, 16)
-    state.keys.serverMac = keys:sub(17, 32)
-    state.keys.clientCipher = keys:sub(33, 48)
-    state.keys.serverCipher = keys:sub(49, 64)
-    state.encrypt = dataCard.encrypt
-    state.decrypt = dataCard.decrypt
-    state.mac = dataCard.md5
-    state.seqnum.write = 0
-    state.seqnum.read = 0
-    state.masterSecret = masterSecret
-    table.insert(state.packets, msg)
-    state.state = state.state + 1
+    local pms = cipher.decrypt(msg, config.crypt.private)
+    if pms then
+      local masterSecret = md5prf(pms, "master secret", state.clientRandom .. state.serverRandom, 48)
+      local keys = md5prf(masterSecret, "key expension", state.serverRandom .. state.clientRandom, 48)
+      state.keys.clientMac = keys:sub(1, 16)
+      state.keys.serverMac = keys:sub(17, 32)
+      state.keys.clientCipher = keys:sub(33, 48)
+      state.keys.serverCipher = keys:sub(49, 64)
+      state.encrypt = dataCard.encrypt
+      state.decrypt = dataCard.decrypt
+      state.mac = dataCard.md5
+      state.seqnum.write = 0
+      state.seqnum.read = 0
+      state.masterSecret = masterSecret
+      table.insert(state.packets, msg)
+      state.state = state.state + 1
+    end
   elseif state.state == STATES.Finished then
     local clientFinished = md5prf(
       state.masterSecret,
