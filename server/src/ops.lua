@@ -76,7 +76,7 @@ local function log(data)
   return line
 end
 
-local function newUser(name)
+local function newUser(name, isAdmin)
   local crypt = module.load("crypt")
   if getUser(name) then
     return false
@@ -84,7 +84,8 @@ local function newUser(name)
   local user = {
     name = name,
     pin = crypt.genPin(),
-    balance = 0
+    balance = 0,
+    admin = isAdmin and true or false
   }
   table.insert(db.db.users, user)
   local id = log {optype = OPERATIONS.NewAccount,

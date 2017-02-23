@@ -96,11 +96,12 @@ events.engine:subscribe("msg", events.priority.normal, function(handler, evt)
     local sessionKey = crypt.genSessionKey(authKey, ops.getUser(conn.operation.user).pin)
     if sessionKey ~= result[2] then
       conn:send(srl.serialize({"error", "bad session key"}))
+      conn.operation.step = crypt.OPSTEPS.None
       return
     end
     conn.operation.session = crypt.genSession()
     conn:send(srl.serialize({"session", conn.operation.session}))
-    conn.operation.step = conn.opeartion.step + 1
+    conn.operation.step = conn.operation.step + 1
   elseif conn.operation.step == crypt.OPSTEPS.Operation then
     local result, data = pcall(srl.unserialize, conn.msg)
     if not result then
@@ -114,22 +115,45 @@ events.engine:subscribe("msg", events.priority.normal, function(handler, evt)
     local session = data[2]
     if conn.operation.session ~= session then
       conn:send(srl.serialize({"error", "bad session"}))
+      conn.operation.step = crypt.OPSTEPS.None
       return
     end
     local operation = data[3]
-    if (not operation ~= ops.OPERATIONS.Transfer or
-        operation ~= ops.OPERATIONS.Buy) then
-      conn:send(srl.seialize({"error", "unknown operation"}))
-      return
+    if ops.getUser(conn.operation.user).admin then
+      if (operation ~= ops.OPERATIONS.NewAccount or
+          operation ~= ops.OPERATIONS.Transfer or
+          operation ~= ops.OPERATIONS.Buy or
+          operation ~= ops.OPERATIONS.Cancel) then
+        conn:send(srl.serialize({"error", "unknown operation"}))
+      end
+    else
+      if (operation ~= ops.OPERATIONS.Transfer or
+          operation ~= ops.OPERATIONS.Buy) then
+        conn:send(srl.serialize({"error", "unknown operation"}))
+        return
+      end
     end
     if (operation == ops.OPERATIONS.Transfer or
         operation == ops.OPERATIONS.Buy) then
       local from, to, amount, comment = table.unpack(data, 4)
-      if not from or not ops.getUser(from) then
+      if type(from) ~= "string" then
+        conn:send(srl.serialize({"error", "bad packet"}))
+        return
+      end
+      if (not ops.getUser(conn.operation.user).admin and
+          conn.operation.user ~= from) then
+        conn:send(srl.serialize({"error", "can't modify this account"}))
+        return
+      end
+      if not ops.getUser(from) then
         conn:send(srl.serialize({"error", "no such user"}))
         return
       end
-      if not to or not ops.getUser(to) then
+      if type(to) ~= "string" then
+        conn:send(srl.serialize({"error", "bad packet"}))
+        return
+      end
+      if not ops.getUser(to) then
         conn:send(srl.serialize({"error", "no such user"}))
         return
       end
@@ -137,7 +161,7 @@ events.engine:subscribe("msg", events.priority.normal, function(handler, evt)
         conn:send(srl.serialize({"error", "bad packet"}))
         return
       end
-      if type(comment) ~= "string" then
+      if type(comment) ~= "string" or #comment == 0 or #comment > 512 then
         conn:send(srl.serialize({"error", "bad packet"}))
         return
       end
@@ -146,6 +170,41 @@ events.engine:subscribe("msg", events.priority.normal, function(handler, evt)
       conn.operation.to = to
       conn.operation.amount = amount
       conn.operation.comment = comment
+      conn.operation.opKey = crypt.genOpKey()
+      conn:send(srl.serialize({"opkey", conn.operation.opKey}))
+      conn.operation.step = conn.operation.step + 1
+    elseif operation == ops.OPERATIONS.NewAccount then
+      local name, isAdmin = table.unpack(data, 4)
+      if type(name) ~= "string" then
+        conn:send(srl.serialize({"error", "bad packet"}))
+        return
+      end
+      if ops.getUser(name) then
+        conn:send(srl.serialize({"error", "account already exists"}))
+        return
+      end
+      if type(isAdmin) ~= "boolean" then
+        conn:send(srl.serialize({"error", "bad packet"}))
+        return
+      end
+      conn.operation.optype = operation
+      conn.operation.name = name
+      conn.operation.isAdmin = isAdmin
+      conn.operation.opKey = crypt.genOpKey()
+      conn:send(srl.serialize({"opkey", conn.operation.opKey}))
+      conn.operation.step = conn.operation.step + 1
+    elseif operation == ops.OPERATIONS.Cancel then
+      local tid = table.unpack(data, 4)
+      if type(tid) ~= "number" then
+        conn:send(srl.serialize({"error", "bad packet"}))
+        return
+      end
+      if not ops.getLine(tid) then
+        conn:send(srl.serialize({"error", "unknown tid"}))
+        return
+      end
+      conn.operation.optype = operation
+      conn.operation.tid = tid
       conn.operation.opKey = crypt.genOpKey()
       conn:send(srl.serialize({"opkey", conn.operation.opKey}))
       conn.operation.step = conn.operation.step + 1
@@ -162,6 +221,7 @@ events.engine:subscribe("msg", events.priority.normal, function(handler, evt)
     end
     if data[2] ~= conn.operation.session then
       conn:send(srl.serialize({"error", "bad session"}))
+      conn.operation.step = crypt.OPSTEPS.None
       return
     end
     local confirmKey = crypt.genConfirmKey(
@@ -170,6 +230,7 @@ events.engine:subscribe("msg", events.priority.normal, function(handler, evt)
       conn.operation)
     if confirmKey ~= data[3] then
       conn:send(srl.serialize({"error", "bad confirmation key"}))
+      conn.operation.step = crypt.OPSTEPS.Operation
       return
     end
     if conn.operation.optype == ops.OPERATIONS.Transfer then
@@ -178,14 +239,22 @@ events.engine:subscribe("msg", events.priority.normal, function(handler, evt)
         conn.operation.to,
         conn.operation.amount,
         conn.operation.comment)
-      conn:send(srl.serialize({"result", result}))
+      conn:send(srl.serialize({"result", result, id}))
     elseif conn.operation.optype == ops.OPERATION.Buy then
       local result, id = ops.buy(
         conn.operation.from,
         conn.operation.to,
         conn.operation.amount,
         conn.operation.comment)
-      conn:send(srl.serialize({"result", result}))
+      conn:send(srl.serialize({"result", result, id}))
+    elseif conn.operation.optype == ops.OPERATION.NewAccount then
+      local result, id = ops.newUser(
+        conn.operation.name,
+        conn.operation.isAdmin)
+      conn:send(srl.serialize({"result", result, id}))
+    elseif conn.operation.optype == ops.OPERATION.Cancel then
+      local result, id = ops.cancel(conn.operation.tid)
+      conn:send(srl.serialize({"result", result, id}))
     end
     conn.operation.step = crypt.OPSTEPS.Operation
   end
