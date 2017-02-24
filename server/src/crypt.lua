@@ -26,10 +26,13 @@ local OPSTEPS = {
 
 local function u64(num)
   num = num % 0xffffffffffffffff
+  local lh = math.floor(num / 0xffffffff)
+  local rh = num - lh * 0xffffffff
   local result = ""
   for i = 1, 8, 1 do
-    result = string.char(bit32.band(num, 0xff)) .. result
-    num = bit32.rshift(num, 8)
+    local part = i <= 4 and lh or rh
+    result = string.char(bit32.band(part, 0xff)) .. result
+    num = bit32.rshift(part, 8)
   end
   return result
 end
@@ -185,13 +188,14 @@ local function handshake(state)
       table.insert(state.packets, msg)
       state.serverRandom = dataCard.random(32)
       state:send(state.serverRandom)
+      table.insert(state.packets, state.serverRandom)
       state.state = state.state + 1
     end
   elseif state.state == STATES.KeyExchange then
     local pms = cipher.decrypt(msg, config.crypt.private)
     if pms then
       local masterSecret = md5prf(pms, "master secret", state.clientRandom .. state.serverRandom, 48)
-      local keys = md5prf(masterSecret, "key expension", state.serverRandom .. state.clientRandom, 48)
+      local keys = md5prf(masterSecret, "key expansion", state.serverRandom .. state.clientRandom, 64)
       state.keys.clientMac = keys:sub(1, 16)
       state.keys.serverMac = keys:sub(17, 32)
       state.keys.clientCipher = keys:sub(33, 48)
