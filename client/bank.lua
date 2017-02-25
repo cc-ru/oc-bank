@@ -1,5 +1,7 @@
 local com = require("component")
 local event = require("event")
+local srl = require("serialization").serialize
+local unsrl = require("serialization").unserialize
 
 local cipher = com.advanced_cipher
 local dataCard = com.data
@@ -22,6 +24,13 @@ local STATES = {
   KeyExchange = 2,
   Finished = 3,
   Established = 4
+}
+
+local OPSTATES = {
+  Auth = 1,
+  Session = 2,
+  Operation = 3,
+  Confirmation = 4
 }
 
 local function u64(num)
@@ -136,10 +145,15 @@ local function newConn()
       end,
       recv = function(self, save)
         -- TODO
+        if msg == "close" then
+          conn = newConn()
+          connected = false
+          return false, msg
+        end
         if save then
           table.insert(self.packets, msg)
         end
-        return msg
+        return true, msg
       end
     }
   })
@@ -158,10 +172,14 @@ function bank.connect()
   if connected then
     return false
   end
+  local result
   local conn = newConn()
   conn.clientRandom = dataCard.random(32)
   conn:send(conn.clientRandom, true)
-  conn.serverRandom = conn:recv(true)
+  result, conn.serverRandom = conn:recv(true)
+  if not result then
+    return false
+  end
   conn.state = conn.state + 1
 
   local pms = dataCard.random(48)
@@ -184,13 +202,15 @@ function bank.connect()
                                 dataCard.md5(table.concat(state.packets)),
                                 12)
   conn:send(clientFinished, true)
-  local recvFinished = conn:recv()
+  local result, recvFinished = conn:recv()
+  if not result then
+    return false
+  end
   local serverFinished = md5prf(state.masterSecret,
                                 "server finished",
                                 dataCard.md5(table.concat(state.packets)),
                                 12)
   if recvFinished ~= serverFinished then
-    conn = newConn()
     return false
   end
   conn.packets = nil
@@ -199,7 +219,62 @@ function bank.connect()
   conn.serverRandom = nil
   conn.state = conn.state + 1
 
+  connected = true
+
   return true
+end
+
+local function auth(user)
+  local state = OPSTATES.Auth
+  local recv = {user}
+  local send = {}
+  local session
+  while true do
+    if not connected then
+      return false, "not connected"
+    end
+    if state == OPSTATES.Auth then
+      conn:send(srl {"auth", recv[1]})
+      local result, data = conn:recv()
+      if not result then
+        return false, data
+      end
+      local result, data = pcall(unsrl, data)
+      if not result then
+        return false, data
+      end
+      if data[1] == "error" then
+        send = {false, data[2]}
+      else
+        send = {data[2]}
+        state = state + 1
+      end
+    elseif state == OPSTATES.Session then
+      conn:send(srl {"sessionKey", recv[1]})
+      local result, data = conn:recv()
+      if not result then
+        return false, data
+      end
+      local result, data = pcall(unsrl, data)
+      if not result then
+        return false, data
+      end
+      if data[1] == "error" then
+        if data[2] == "bad session key" then
+          state = OPSTATES.Auth
+        end
+        send = {false, data[2]}
+      else
+        session = data[2]
+        send = {true}
+      end
+    end
+    recv = {coroutine.yield(table.unpack(send))}
+  end
+end
+
+function bank.auth()
+  return coroutine.create(auth)
 end
 
 function bank.disconnect()
@@ -208,5 +283,6 @@ function bank.disconnect()
   end
   conn:send("close")
   conn = newConn()
+  connected = false
   return true
 end

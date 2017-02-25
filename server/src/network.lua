@@ -74,7 +74,11 @@ events.engine:subscribe("msg", events.priority.normal, function(handler, evt)
       conn:send(srl.serialize({"error", "malformed data"}))
       return
     end
-    local user = data[1]
+    if data[1] ~= "auth" then
+      conn:send(srl.serialize({"error", "bad packet"}))
+      return
+    end
+    local user = data[2]
     if not ops.getUser(user) then
       conn:send(srl.serialize({"error", "no such user"}))
       return
