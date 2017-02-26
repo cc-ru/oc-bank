@@ -169,6 +169,10 @@ events.engine:subscribe("msg", events.priority.normal, function(handler, evt)
         conn:send(srl.serialize({"error", "bad packet"}))
         return
       end
+      if ops.getUser(conn.operation.user).balance - amount < 0 then
+        conn:send(srl.serialize({"error", "not enough money"}))
+        return
+      end
       conn.operation.optype = operation
       conn.operation.from = from
       conn.operation.to = to

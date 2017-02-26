@@ -33,6 +33,9 @@ local OPSTATES = {
   Confirmation = 4
 }
 
+-- Create a unique table to identify the state request
+local getState = {}
+
 local function u64(num)
   num = num % 0xffffffffffffffff
   local lh = math.floor(num / 0xffffffff)
@@ -230,6 +233,10 @@ local function auth(user)
   local send = {}
   local session
   while true do
+    if recv[1] == getState then
+      send = {state}
+      goto yield
+    end
     if not connected then
       return false, "not connected"
     end
@@ -267,14 +274,71 @@ local function auth(user)
       else
         session = data[2]
         send = {true}
+        state = state + 1
+      end
+    elseif state == OPSTATES.Operation then
+      conn:send(srl {"operation", session, table.unpack(recv)})
+      local result, data = conn:recv()
+      if not result then
+        return false, data
+      end
+      local result, data = pcall(unsrl, data)
+      if not result then
+        return false, data
+      end
+      if data[1] == "error" then
+        if data[2] == "bad session" then
+          state = OPSTATES.Auth
+        end
+        send = {false, data[2]}
+      else
+        send = {data[2]}
+        state = state + 1
+      end
+    elseif state == OPSTATES.Confirmation then
+      conn:send(srl {"confirmation", session, recv[1]})
+      local result, data = conn:recv()
+      if not result then
+        return false, data
+      end
+      local result, data = pcall(unsrl, data)
+      if not result then
+        return false, data
+      end
+      if data[1] == "error" then
+        if data[2] == "bad session" then
+          state = OPSTATES.Auth
+        elseif data[2] == "bad confirmation key" then
+          state = OPSTATES.Operation
+        end
+        send = {false, data[2]}
+      else
+        send = {"result", data[2], data[3]}
+        state = OPSTATES.Operation
       end
     end
+    ::yield::
     recv = {coroutine.yield(table.unpack(send))}
   end
 end
 
 function bank.auth()
-  return coroutine.create(auth)
+  local co = coroutine.create(auth)
+  return setmetatable({}, {
+    __call = function(self, ...)
+      if coroutine.status(co) == "dead" then
+        return false, "dead"
+      end
+      local result = {coroutine.resume(co, ...)}
+      if not result[1] then
+        error(result[2])
+      end
+      return table.unpack(result, 2)
+    end,
+    __len = function(self)
+      return self(getState)
+    end
+  })
 end
 
 function bank.disconnect()
@@ -286,3 +350,5 @@ function bank.disconnect()
   connected = false
   return true
 end
+
+return bank
