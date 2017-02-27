@@ -26,8 +26,8 @@ local OPSTEPS = {
 
 local function u64(num)
   num = num % 0xffffffffffffffff
-  local lh = math.floor(num / 0xffffffff)
-  local rh = num - lh * 0xffffffff
+  local lh = math.floor(num / 2^32)
+  local rh = num - lh * 2^32
   local result = ""
   for i = 1, 8, 1 do
     local part = i <= 4 and lh or rh

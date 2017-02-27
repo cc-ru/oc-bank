@@ -38,8 +38,8 @@ local getState = {}
 
 local function u64(num)
   num = num % 0xffffffffffffffff
-  local lh = math.floor(num / 0xffffffff)
-  local rh = num - lh * 0xffffffff
+  local lh = math.floor(num / 2^32)
+  local rh = num - lh * 2^32
   local result = ""
   for i = 1, 8, 1 do
     local part = i <= 4 and lh or rh
@@ -100,8 +100,7 @@ local function newConn()
     packets = {},
     clientRandom = "",
     serverRandom = "",
-    masterSecret = "",
-    msg = ""
+    masterSecret = ""
   }
 
   setmetatable(conn, {
@@ -147,16 +146,21 @@ local function newConn()
         end
       end,
       recv = function(self, save)
-        -- TODO
-        if msg == "close" then
-          conn = newConn()
-          connected = false
-          return false, msg
+        local data = {event.pull(15, "zn_message", nil, serverAddr)}
+        if data[1] then
+          local msg = data[2]
+          if msg == "close" then
+            conn = newConn()
+            connected = false
+            return false, msg
+          end
+          if save then
+            table.insert(self.packets, msg)
+          end
+          return true, msg
+        else
+          return false, "timed out"
         end
-        if save then
-          table.insert(self.packets, msg)
-        end
-        return true, msg
       end
     }
   })
@@ -180,7 +184,7 @@ function bank.connect()
   conn.clientRandom = dataCard.random(32)
   conn:send(conn.clientRandom, true)
   result, conn.serverRandom = conn:recv(true)
-  if not result then
+  if not result or #conn.serverRandom ~= 32 then
     return false
   end
   conn.state = conn.state + 1
