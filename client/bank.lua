@@ -355,4 +355,6 @@ function bank.disconnect()
   return true
 end
 
+bank.state = OPSTATES
+
 return bank
